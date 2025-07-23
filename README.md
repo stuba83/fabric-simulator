@@ -1,262 +1,204 @@
-# 📊 Guía Completa del Simulador de Microsoft Fabric
-## Bursting, Smoothing y Throttling Explicados
+# 📊 Microsoft Fabric Simulator
+## Simulador Interactivo de Bursting, Smoothing y Throttling
+
+[![Deploy to Azure](https://img.shields.io/badge/Deploy%20to-Azure-blue?logo=microsoftazure)](https://green-glacier-0af1a471e.2.azurestaticapps.net)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/stuba83/fabric-simulator.svg)](https://github.com/stuba83/fabric-simulator/stargazers)
+
+> **🚀 [DEMO EN VIVO](https://green-glacier-0af1a471e.2.azurestaticapps.net)** - ¡Prueba el simulador ahora!
 
 ---
 
-## 🎯 **Propósito del Simulador**
+## 🎯 **¿Qué es este simulador?**
 
-Este simulador te permite **experimentar y comprender** los mecanismos críticos de Microsoft Fabric:
-- **Bursting:** Cómo Fabric permite usar temporalmente más CUs de los contratados
-- **Smoothing:** Cómo se distribuyen los overages durante 24 horas para evitar picos de facturación
-- **Throttling:** Cuándo y por qué se activan las restricciones de rendimiento
+Una herramienta interactiva que te permite **experimentar y comprender** los mecanismos críticos de Microsoft Fabric sin afectar tu entorno de producción:
 
----
+- **🔥 Bursting:** Simula cómo Fabric permite usar temporalmente más CUs de los contratados
+- **📈 Smoothing:** Visualiza cómo se distribuyen los overages durante 24 horas 
+- **🚦 Throttling:** Experimenta cuándo y por qué se activan las restricciones de rendimiento
 
-## 🏗️ **Arquitectura del Simulador**
+## ✨ **Características Principales**
 
-### **📊 Gráfico Principal**
-Muestra la comparación hora por hora de:
-- **🟢 Línea Verde (Baseline Capacity):** CUs contratados según tu SKU
-- **🔴 Línea Roja (Utilización Real):** Consumo real sin smoothing - muestra los picos reales
-- **🟡 Línea Amarilla (Utilización Smoothed):** Lo que realmente se factura después del smoothing
-- **🟣 Zona Púrpura (Throttling Zone):** Áreas donde se activa throttling
+### 🎮 **Escenarios Predefinidos**
+- **🟢 Sin Smoothing** - Operaciones dentro del baseline
+- **🔵 Burst + Smoothing** - Ejemplo básico de smoothing
+- **🟡 Heavy Smoothing** - Burst intenso con distribución prolongada
+- **🔴 Multiple Bursts** - Múltiples operaciones concurrentes
+- **🟣 Weekend Smoothing** - Explica el "consumo fantasma" de fin de semana
+- **🚫 Demo Throttling** - Muestra todos los tipos de throttling
+- **🔓 Sin Throttling** - Comportamiento con capacidad adecuada
+- **🏢 Enterprise Scale** - Escenarios de gran escala (F256)
 
-### **⚡ Gráfico de Overages**
-Visualiza el ciclo completo de overages:
-- **📊 Barras Azules (Overage Generado):** Momento exacto cuando se crea el overage
-- **🟠 Línea Naranja (Overage Acumulado):** Cuánto overage queda por "quemar"
-- **🌸 Línea Rosa (Future Capacity):** Capacidad futura consumida (crítica para throttling)
+### 🎛️ **Controles Configurables**
+- **Capacidades SKU:** F2 hasta F256 (2-256 CUs)
+- **Configuración de Burst:** Hora, intensidad y duración
+- **Políticas de Throttling:** Interactive Delay/Rejection, Background Rejection
+- **Actividad Base:** Simula carga de trabajo típica
 
----
+### 📊 **Visualizaciones Avanzadas**
+- **Gráfico Principal:** Comparación Real vs Smoothed utilization
+- **Gráfico de Overages:** Acumulación y burn-down de overages
+- **Análisis de Throttling:** Timeline detallado con causas específicas
+- **Métricas en Tiempo Real:** Tooltips informativos por hora
 
-## 🎛️ **Controles Principales**
+## 🚀 **Acceso Rápido**
 
-### **⚙️ Configuración Básica**
-
-| Control | Función | Valores Recomendados |
-|---------|---------|---------------------|
-| **Capacidad SKU** | Define CUs baseline disponibles | F8 (8 CUs) para pruebas generales |
-| **Hora del Burst** | Cuándo ocurre la operación intensa | 9 AM (horario laboral típico) |
-| **CUs del Burst** | Intensidad de la operación | 2-4x el baseline para ver efectos claros |
-| **Duración** | Tiempo de la operación intensa | 30-60 minutos para workloads típicos |
-| **Actividad Base** | Carga constante de background | 40% para simular uso normal |
-| **Ops Adicionales** | Otras operaciones concurrentes | "Moderadas" para escenarios realistas |
-
-### **🚦 Controles de Throttling**
-
-| Parámetro | Significado | Valor Por Defecto | Propósito |
-|-----------|-------------|-------------------|-----------|
-| **Interactive Delay** | Tiempo hasta que queries interactivos se ralentizan | 10 min | Política oficial de Microsoft |
-| **Interactive Rejection** | Tiempo hasta rechazo total de queries | 60 min | Límite crítico documentado |
-| **Background Rejection** | Límite de future capacity para jobs background | 24 horas | Previene acumulación excesiva |
-| **Overage Protection** | Tiempo libre de throttling al exceder baseline | 10 min | "Colchón" oficial de Microsoft |
-
----
-
-## 🎮 **Escenarios Predefinidos**
-
-### **🟢 Sin Smoothing**
-- **Propósito:** Mostrar operaciones que NO generan overages
-- **Configuración:** Burst pequeño dentro del baseline
-- **Aprendizaje:** Cuándo NO necesitas preocuparte por smoothing
-
-### **🔵 Burst + Smoothing**
-- **Propósito:** Ejemplo básico de smoothing en acción
-- **Configuración:** Burst moderado que genera overage manejable
-- **Aprendizaje:** Cómo 1 hora de burst se distribuye en 24 horas
-
-### **🟡 Heavy Smoothing**
-- **Propósito:** Burst grande con smoothing significativo
-- **Configuración:** Burst 4-8x el baseline
-- **Aprendizaje:** Impacto de operaciones muy intensas en días posteriores
-
-### **🔴 Multiple Bursts**
-- **Propósito:** Múltiples operaciones intensas en el mismo día
-- **Configuración:** Capacity más grande con múltiples picos
-- **Aprendizaje:** Cómo se acumulan overages de diferentes operaciones
-
-### **🟣 Weekend Smoothing**
-- **Propósito:** Demostrar por qué hay consumo en fines de semana
-- **Configuración:** Burst de viernes que afecta el weekend
-- **Aprendizaje:** Resolver el misterio del "consumo fantasma"
-
-### **🚫 Demo Throttling**
-- **Propósito:** Activar todos los tipos de throttling
-- **Configuración:** Capacity pequeña con burst masivo
-- **Aprendizaje:** Consecuencias de subdimensionar capacidad
-
-### **🔓 Sin Throttling**
-- **Propósito:** Mostrar comportamiento ideal sin restricciones
-- **Configuración:** Capacity grande que nunca se satura
-- **Aprendizaje:** Beneficios de capacidades bien dimensionadas
-
-### **🏢 Enterprise Scale**
-- **Propósito:** Comportamiento a escala empresarial
-- **Configuración:** F256 con workloads masivos
-- **Aprendizaje:** Dinámicas de organizaciones grandes
-
----
-
-## 🔍 **Interpretando los Resultados**
-
-### **📈 Panel de Análisis de Smoothing**
-
-**✅ Smoothing Activo:**
+### **🌐 Versión Web (Recomendada)**
 ```
-Overage Total: 12.5 CU-hours
-Distribución: 0.52 CUs/hora por 24h
-Peak Acumulado: 12.5 CU-hours
-Remanente Final: 0.0 CU-hours
+https://green-glacier-0af1a471e.2.azurestaticapps.net
+```
+*Funciona en cualquier navegador moderno - no requiere instalación*
+
+### **💻 Ejecutar Localmente**
+```bash
+# Clonar el repositorio
+git clone https://github.com/stuba83/fabric-simulator.git
+
+# Navegar al directorio
+cd fabric-simulator
+
+# Abrir en navegador
+open index.html
+# O para Windows: start index.html
+# O para Linux: xdg-open index.html
 ```
 
-**Interpretación:**
-- Una operación generó 12.5 CU-hours de overage
-- Se distribuye como +0.52 CUs adicionales cada hora
-- Al final de 24h, todo el overage se "quemó"
+## 📖 **Cómo Usar el Simulador**
 
-### **🚦 Panel de Análisis de Throttling**
+### **🔰 Para Principiantes**
+1. **Visita** [el simulador en vivo](https://green-glacier-0af1a471e.2.azurestaticapps.net)
+2. **Prueba** el escenario "🔵 Burst + Smoothing" 
+3. **Observa** las diferencias entre utilización Real vs Smoothed
+4. **Experimenta** con diferentes SKUs y configuraciones
 
-**🚨 Estados de Throttling:**
-- **📊 Interactive Delay:** Queries lentos pero ejecutándose
-- **🚫 Interactive Rejection:** Queries rechazados completamente  
-- **⛔ Background Rejection:** Jobs background bloqueados
-- **🛡️ Protección:** Período de gracia sin throttling
+### **🎯 Para Diagnóstico de Problemas**
+1. **Replica tu entorno:** Ajusta SKU y carga base
+2. **Simula tu workload:** Configura burst similar a tus operaciones
+3. **Identifica causas:** Usa el timeline de throttling
+4. **Optimiza:** Encuentra la configuración ideal
 
-### **📊 Timeline de Throttling**
-Tabla que muestra:
-- **Hora:** Cuándo ocurrió cada evento
-- **Util%:** Porcentaje de utilización vs baseline
-- **Severidad:** Nivel de impacto (Warning/Danger/Critical)
-- **Estado:** Tipo específico de throttling activo
+### **📏 Para Dimensionamiento**
+1. **Empieza conservador:** F8 o F16 
+2. **Incrementa carga:** Hasta ver throttling
+3. **Encuentra el balance:** Entre costo y rendimiento
+4. **Valida con scenarios reales:** Múltiples bursts, weekend smoothing
 
----
+## 🎓 **Casos de Uso Reales**
 
-## 💡 **Casos de Uso Prácticos**
+### **🔍 Diagnóstico: "¿Por qué hay throttling?"**
+```
+Problema: Usuarios reportan queries lentos a las 2 PM
+Solución: 
+1. Usar "Demo Throttling" 
+2. Configurar burst a las 14:00
+3. Identificar Interactive Delay como causa
+4. Ajustar horarios o escalar capacidad
+```
 
-### **🔬 Diagnóstico de Problemas**
+### **👻 Diagnóstico: "Consumo fantasma en weekends"**
+```
+Problema: Fabric consume CUs los sábados sin actividad
+Solución:
+1. Usar "Weekend Smoothing"
+2. Configurar burst viernes a las 18:00  
+3. Observar smoothing hasta el domingo
+4. Explicar a stakeholders con gráficos
+```
 
-**Problema:** "Tenemos throttling y no sabemos por qué"
-1. Usa el escenario **Demo Throttling**
-2. Observa el timeline para identificar patrones
-3. Ajusta la configuración hasta replicar tu situación real
-4. Identifica las causas específicas en el panel de análisis
+### **💰 Optimización: "¿Necesitamos F32 o basta F16?"**
+```
+Objetivo: Validar dimensionamiento antes de upgrade
+Proceso:
+1. Simular carga actual en F16
+2. Incrementar burst hasta ver throttling crítico
+3. Comparar con F32 sin throttling
+4. Calcular ROI del upgrade
+```
 
-**Problema:** "Hay consumo en weekends sin actividad"
-1. Usa el escenario **Weekend Smoothing** 
-2. Ve cómo un burst de viernes afecta sábado y domingo
-3. Explica el fenómeno a stakeholders usando los gráficos
+## 🛠️ **Tecnologías Utilizadas**
 
-### **📏 Dimensionamiento de Capacidad**
+- **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
+- **Gráficos:** Chart.js 3.9.1
+- **Hosting:** Azure Static Web Apps
+- **CI/CD:** GitHub Actions
+- **Responsive:** Compatible con móviles y tablets
 
-**Objetivo:** Determinar el SKU apropiado
-1. Empieza con tu carga real estimada
-2. Usa **Sin Throttling** como objetivo ideal
-3. Encuentra el SKU mínimo que evita throttling crítico
-4. Considera el costo vs benefit de capacidades mayores
+## 📊 **Documentación Técnica**
 
-### **⏰ Planificación de Workloads**
+### **Conceptos Implementados**
+- **Bursting Factor:** Cálculo según documentación oficial de Microsoft
+- **Smoothing de 24h:** Para operaciones background según políticas reales
+- **Throttling Progresivo:** Interactive Delay → Interactive Rejection → Background Rejection
+- **Future Capacity:** Métrica crítica para background job throttling
 
-**Objetivo:** Optimizar horarios de ejecución
-1. Simula diferentes horas de burst
-2. Observa cómo afecta el smoothing posterior
-3. Encuentra ventanas óptimas que minimizan conflictos
-4. Planifica operaciones críticas en horarios de baja actividad
+### **Configuraciones por Defecto**
+```javascript
+Interactive Delay: 10 minutos
+Interactive Rejection: 60 minutos  
+Background Rejection: 24 horas
+Overage Protection: 10 minutos
+```
 
----
+## 🤝 **Contribuir**
 
-## 🎯 **Tips para Uso Efectivo**
+### **🐛 Reportar Issues**
+- Usa [GitHub Issues](https://github.com/stuba83/fabric-simulator/issues)
+- Incluye screenshot y pasos para reproducir
+- Especifica navegador y versión
 
-### **🔄 Flujo de Trabajo Recomendado**
+### **✨ Sugerir Mejoras**
+- Fork el repositorio
+- Crear feature branch: `git checkout -b feature/nueva-funcionalidad`
+- Commit cambios: `git commit -m 'Add nueva funcionalidad'`
+- Push branch: `git push origin feature/nueva-funcionalidad`
+- Abrir Pull Request
 
-1. **Exploración Inicial**
-   - Prueba todos los escenarios predefinidos
-   - Familiarízate con los conceptos básicos
-   - Observa las diferencias entre Real vs Smoothed
+### **📝 Mejoras Deseadas**
+- [ ] Exportar configuraciones como JSON
+- [ ] Importar datos de Fabric Capacity Metrics App
+- [ ] Simulador de múltiples workspaces
+- [ ] Calculadora de costos integrada
+- [ ] Comparador de SKUs lado a lado
 
-2. **Replicación de tu Entorno**
-   - Ajusta SKU a tu capacidad actual
-   - Configura burst similar a tus workloads reales
-   - Establece actividad base según tu uso típico
+## 📚 **Recursos Relacionados**
 
-3. **Experimentación Dirigida**
-   - Cambia un parámetro a la vez
-   - Observa el impacto en throttling
-   - Documenta configuraciones que funcionan bien
+### **📖 Documentación Official Microsoft**
+- [Fabric Throttling](https://learn.microsoft.com/en-us/fabric/enterprise/throttling)
+- [Capacity Metrics App](https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app)
+- [Burstable Capacity](https://learn.microsoft.com/en-us/fabric/data-warehouse/burstable-capacity)
 
-4. **Análisis de Escenarios**
-   - Usa tooltips para detalles por hora
-   - Compara métricas entre configuraciones
-   - Identifica puntos de inflexión críticos
+### **🎥 Videos y Tutoriales**
+- [Fabric Capacity Planning](https://learn.microsoft.com/en-us/fabric/enterprise/plan-capacity)
+- [Optimize Capacity](https://learn.microsoft.com/en-us/fabric/enterprise/optimize-capacity)
 
-### **⚠️ Interpretaciones Importantes**
+### **🛠️ Herramientas Complementarias**
+- [Fabric SKU Estimator](https://learn.microsoft.com/en-us/fabric/enterprise/fabric-sku-estimator)
+- [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/)
 
-**Smoothing NO afecta rendimiento:**
-- La operación original corre a máxima velocidad
-- Solo cambia CUÁNDO se factura el consumo
-- El smoothing es transparente para el usuario final
+## 📜 **Licencia**
 
-**Throttling SÍ afecta rendimiento:**
-- Interactive Delay = queries más lentos
-- Interactive Rejection = queries completamente bloqueados
-- Background Rejection = jobs diferidos o cancelados
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
 
-**Future Capacity es clave:**
-- Es la métrica crítica para throttling de background jobs
-- Se acumula con cada overage
-- Solo se reduce cuando hay capacidad idle
+## 👨‍💻 **Autor**
 
----
-
-## 🚨 **Señales de Alerta**
-
-### **🔴 Throttling Crítico**
-- Background Rejection activo por >4 horas
-- Interactive Rejection durante horarios laborales
-- Future Capacity >48 horas acumuladas
-
-### **🟡 Throttling Preventivo**
-- Interactive Delay frecuente
-- Utilización >120% durante >2 horas
-- Overage Protection agotándose regularmente
-
-### **🟢 Configuración Saludable**
-- Throttling ocasional y breve
-- Smoothing distribuyendo overages efectivamente
-- Future Capacity manteniéndose <24 horas
-
----
-
-## 📚 **Conceptos Clave para Recordar**
-
-### **🎯 Bursting**
-- ✅ Permite superar baseline temporalmente
-- ✅ Acelera operaciones críticas
-- ⚠️ Genera overage que debe "pagarse" después
-
-### **📊 Smoothing**
-- ✅ Distribuye overages durante 24 horas
-- ✅ Reduce picos de facturación
-- ⚠️ Puede causar throttling horas después del burst original
-
-### **🚦 Throttling**
-- ✅ Protege la plataforma de sobrecarga
-- ✅ Aplica políticas progresivas y justas
-- ⚠️ Puede impactar significativamente el rendimiento
-
-### **💰 Implicaciones de Costos**
-- Baseline = costo fijo mensual
-- Overage = NO genera costo adicional (se distribuye)
-- Throttling = costo de oportunidad y productividad
+**stuba83** - [GitHub Profile](https://github.com/stuba83)
 
 ---
 
-## 🔗 **Recursos Adicionales**
+## 🌟 **¿Te resultó útil?**
 
-Para profundizar en estos conceptos, consulta:
-- [Documentación oficial de throttling](https://learn.microsoft.com/en-us/fabric/enterprise/throttling)
-- [Fabric Capacity Metrics App](https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app)
-- [Burstable Capacity en Data Warehouse](https://learn.microsoft.com/en-us/fabric/data-warehouse/burstable-capacity)
+Si este simulador te ayudó a entender mejor Microsoft Fabric:
+- ⭐ **Dale una estrella** a este repositorio
+- 🔄 **Compártelo** con tu equipo
+- 💬 **Deja feedback** en Issues
+- 🤝 **Contribuye** con mejoras
 
 ---
 
-*Esta guía acompaña al simulador interactivo y debe usarse como referencia durante la experimentación práctica con diferentes escenarios y configuraciones.*
+### 📊 **Stats del Proyecto**
+
+![GitHub last commit](https://img.shields.io/github/last-commit/stuba83/fabric-simulator)
+![GitHub repo size](https://img.shields.io/github/repo-size/stuba83/fabric-simulator)
+![Website](https://img.shields.io/website?url=https://green-glacier-0af1a471e.2.azurestaticapps.net)
+
+**🎯 Hecho con ❤️ para la comunidad de Microsoft Fabric**
