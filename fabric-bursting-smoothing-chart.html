@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microsoft Fabric: Simulador Completo de Bursting, Smoothing y Throttling</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #0078d4;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .control-group {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e1e1e1;
+        }
+        .control-group h4 {
+            margin: 0 0 10px 0;
+            color: #323130;
+            font-size: 14px;
+        }
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .scenario-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .scenario-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .scenario-btn.normal { background: #28a745; color: white; }
+        .scenario-btn.burst { background: #17a2b8; color: white; }
+        .scenario-btn.throttle { background: #dc3545; color: white; }
+        .scenario-btn.mixed { background: #ffc107; color: black; }
+        .scenario-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .chart-wrapper {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 10px 0;
+        }
+        .chart-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #323130;
+        }
+        .results-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .analysis-panel {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .analysis-panel h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .throttling-alert {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .no-throttling {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .smoothing-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        .title {
+            text-align: center;
+            color: #323130;
+            margin-bottom: 20px;
+        }
+        .metric-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0078d4;
+        }
+        .overage-table {
+            font-size: 12px;
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .overage-table th, .overage-table td {
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+            text-align: center;
+        }
+        .overage-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🧪 Simulador Completo: Bursting, Smoothing y Throttling en Microsoft Fabric</h1>
+        
+        <div class="controls-panel">
+            <h3>🎛️ Controles de Simulación</h3>
+            <div class="controls-grid">
+                <div class="control-group">
+                    <h4>Capacidad SKU</h4>
+                    <select id="skuSelect">
+                        <option value="2">F2 (2 CUs)</option>
+                        <option value="4">F4 (4 CUs)</option>
+                        <option value="8" selected>F8 (8 CUs)</option>
+                        <option value="16">F16 (16 CUs)</option>
+                        <option value="32">F32 (32 CUs)</option>
+                        <option value="64">F64 (64 CUs)</option>
+                        <option value="128">F128 (128 CUs)</option>
+                        <option value="256">F256 (256 CUs)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <h4>Hora del Burst</h4>
+                    <input type="number" id="burstHour" min="0" max="23" value="9" />
+                </div>
+                <div class="control-group">
+                    <h4>CUs del Burst</h4>
+                    <input type="number" id="burstCUs" min="0" max="512" value="32" />
+                </div>
+                <div class="control-group">
+                    <h4>Duración (minutos)</h4>
+                    <input type="number" id="burstDuration" min="5" max="120" value="30" />
+                </div>
+                <div class="control-group">
+                    <h4>Actividad Base (%)</h4>
+                    <input type="number" id="baseActivity" min="0" max="100" value="40" />
+                </div>
+                <div class="control-group">
+                    <h4>Operaciones Adicionales</h4>
+                    <select id="additionalOps">
+                        <option value="none">Ninguna</option>
+                        <option value="light">Ligeras</option>
+                        <option value="moderate" selected>Moderadas</option>
+                        <option value="heavy">Intensas</option>
+                    </select>
+                </div>
+            </div>
+            
+            <h4 style="margin: 15px 0 10px 0; color: #dc3545;">🚦 Configuración de Throttling</h4>
+            <div class="controls-grid">
+                <div class="control-group">
+                    <h4>Interactive Delay (min)</h4>
+                    <input type="number" id="interactiveDelayThreshold" min="1" max="60" value="10" />
+                    <small style="color: #666;">Tiempo hasta delay de queries interactivos</small>
+                </div>
+                <div class="control-group">
+                    <h4>Interactive Rejection (min)</h4>
+                    <input type="number" id="interactiveRejectionThreshold" min="10" max="180" value="60" />
+                    <small style="color: #666;">Tiempo hasta rechazo de queries interactivos</small>
+                </div>
+                <div class="control-group">
+                    <h4>Background Rejection (hours)</h4>
+                    <input type="number" id="backgroundRejectionThreshold" min="1" max="48" value="24" />
+                    <small style="color: #666;">Future capacity límite para background jobs</small>
+                </div>
+                <div class="control-group">
+                    <h4>Overage Protection (min)</h4>
+                    <input type="number" id="overageProtection" min="0" max="30" value="10" />
+                    <small style="color: #666;">Tiempo de protección sin throttling</small>
+                </div>
+                <div class="control-group">
+                    <h4>Throttling Habilitado</h4>
+                    <select id="throttlingEnabled">
+                        <option value="true" selected>Sí (Comportamiento Real)</option>
+                        <option value="false">No (Solo Monitoring)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <h4>Modo de Throttling</h4>
+                    <select id="throttlingMode">
+                        <option value="progressive" selected>Progresivo (Oficial)</option>
+                        <option value="immediate">Inmediato</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="scenario-buttons">
+                <button class="scenario-btn normal" onclick="loadScenario('normal')">
+                    🟢 Sin Smoothing
+                </button>
+                <button class="scenario-btn burst" onclick="loadScenario('simple_burst')">
+                    🔵 Burst + Smoothing
+                </button>
+                <button class="scenario-btn throttle" onclick="loadScenario('heavy_smoothing')">
+                    🟡 Heavy Smoothing
+                </button>
+                <button class="scenario-btn mixed" onclick="loadScenario('multiple_bursts')">
+                    🔴 Multiple Bursts
+                </button>
+                <button class="scenario-btn" style="background: #6f42c1; color: white;" onclick="loadScenario('weekend_smoothing')">
+                    🟣 Weekend Smoothing
+                </button>
+                <button class="scenario-btn" style="background: #fd7e14; color: white;" onclick="updateCharts()">
+                    🔄 Simular Personalizado
+                </button>
+                <button class="scenario-btn" style="background: #dc3545; color: white;" onclick="loadScenario('throttling_demo')">
+                    🚫 Demo Throttling
+                </button>
+                <button class="scenario-btn" style="background: #6c757d; color: white;" onclick="loadScenario('no_throttling')">
+                    🔓 Sin Throttling
+                </button>
+                <button class="scenario-btn" style="background: #495057; color: white;" onclick="loadScenario('enterprise_scale')">
+                    🏢 Enterprise Scale
+                </button>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <div class="chart-title">📊 Vista Principal: Capacidad vs Utilización Real vs Smoothed</div>
+                <div class="chart-container">
+                    <canvas id="mainChart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #28a745;"></div>
+                        <span>Baseline Capacity</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #dc3545;"></div>
+                        <span>Utilización Real (sin smoothing)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ffc107;"></div>
+                        <span>Utilización Smoothed (facturada)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #6610f2;"></div>
+                        <span>Throttling Zone</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <div class="chart-title">⚡ Vista de Overages: Acumulación y Burn-down</div>
+                <div class="chart-container">
+                    <canvas id="overageChart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #17a2b8;"></div>
+                        <span>Overage Generado</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #fd7e14;"></div>
+                        <span>Overage Acumulado</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e83e8c;"></div>
+                        <span>Future Capacity Consumida</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-panel">
+            <div class="analysis-panel">
+                <h4>🚦 Análisis de Throttling</h4>
+                <div id="throttlingStatus">Ejecuta una simulación</div>
+                <div id="throttlingCauses"></div>
+                <div id="throttlingTimeline"></div>
+            </div>
+            <div class="analysis-panel">
+                <h4>📈 Análisis de Smoothing</h4>
+                <div id="smoothingAnalysis">Ejecuta una simulación</div>
+            </div>
+            <div class="analysis-panel">
+                <h4>📊 Métricas Detalladas</h4>
+                <div id="metricsContent">
+                    <p><strong>Max Real:</strong> <span class="metric-value" id="maxReal">-</span></p>
+                    <p><strong>Max Smoothed:</strong> <span class="metric-value" id="maxSmoothed">-</span></p>
+                    <p><strong>Overage Total:</strong> <span class="metric-value" id="totalOverage">-</span></p>
+                    <p><strong>Horas Throttling:</strong> <span class="metric-value" id="throttleHours">-</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mainChart = null;
+        let overageChart = null;
+        let currentData = {};
+
+        // Escenarios predefinidos que muestran smoothing claramente
+        const scenarios = {
+            normal: { sku: 8, burstHour: 10, burstCUs: 10, burstDuration: 15, baseActivity: 30, additionalOps: 'none' },
+            simple_burst: { sku: 8, burstHour: 9, burstCUs: 24, burstDuration: 30, baseActivity: 25, additionalOps: 'light' },
+            heavy_smoothing: { sku: 8, burstHour: 8, burstCUs: 64, burstDuration: 60, baseActivity: 35, additionalOps: 'moderate' },
+            multiple_bursts: { sku: 16, burstHour: 6, burstCUs: 48, burstDuration: 45, baseActivity: 50, additionalOps: 'heavy' },
+            weekend_smoothing: { sku: 4, burstHour: 23, burstCUs: 32, burstDuration: 90, baseActivity: 10, additionalOps: 'none' },
+            throttling_demo: { sku: 4, burstHour: 8, burstCUs: 40, burstDuration: 120, baseActivity: 80, additionalOps: 'heavy' },
+            no_throttling: { sku: 64, burstHour: 9, burstCUs: 128, burstDuration: 60, baseActivity: 40, additionalOps: 'moderate' },
+            enterprise_scale: { sku: 256, burstHour: 14, burstCUs: 512, burstDuration: 120, baseActivity: 60, additionalOps: 'heavy' }
+        };
+
+        function loadScenario(scenarioName) {
+            const scenario = scenarios[scenarioName];
+            if (!scenario) return;
+
+            document.getElementById('skuSelect').value = scenario.sku;
+            document.getElementById('burstHour').value = scenario.burstHour;
+            document.getElementById('burstCUs').value = scenario.burstCUs;
+            document.getElementById('burstDuration').value = scenario.burstDuration;
+            document.getElementById('baseActivity').value = scenario.baseActivity;
+            document.getElementById('additionalOps').value = scenario.additionalOps;
+
+            updateCharts();
+        }
+
+        function calculateSmoothingDistribution(burstHour, burstCUs, burstDuration, baselineCUs) {
+            // Calcular el overage total de la operación
+            const realCUsUsed = burstCUs * (burstDuration / 60); // CU-hours
+            const baselineEquivalent = baselineCUs * (burstDuration / 60);
+            const totalOverage = Math.max(0, realCUsUsed - baselineEquivalent);
+            
+            // Smoothing se distribuye durante 24 horas (background operations)
+            const smoothingPerHour = totalOverage / 24;
+            
+            return {
+                totalOverage,
+                smoothingPerHour,
+                realCUsUsed,
+                baselineEquivalent
+            };
+        }
+
+        function generateAdditionalOperations(hour, additionalOps, baselineCUs) {
+            let additional = 0;
+            const random = Math.random();
+            
+            switch(additionalOps) {
+                case 'light':
+                    if (random < 0.2) additional = baselineCUs * 0.5 * (0.5 + Math.random() * 0.5);
+                    break;
+                case 'moderate':
+                    if (random < 0.3) additional = baselineCUs * 1.0 * (0.5 + Math.random() * 0.5);
+                    if (hour >= 14 && hour <= 17 && random < 0.4) additional += baselineCUs * 0.3;
+                    break;
+                case 'heavy':
+                    if (random < 0.4) additional = baselineCUs * 1.5 * (0.5 + Math.random() * 0.5);
+                    if (hour >= 8 && hour <= 18 && random < 0.5) additional += baselineCUs * 0.4;
+                    if (hour >= 14 && hour <= 16) additional += baselineCUs * 0.2;
+                    break;
+            }
+            return additional;
+        }
+
+        function calculateThrottlingStates(smoothedUtilization, futureCapacityConsumed, baselineCUs, hours) {
+            const interactiveDelayThreshold = parseInt(document.getElementById('interactiveDelayThreshold').value) / 60;
+            const interactiveRejectionThreshold = parseInt(document.getElementById('interactiveRejectionThreshold').value) / 60;
+            const backgroundRejectionThreshold = parseInt(document.getElementById('backgroundRejectionThreshold').value);
+            const overageProtection = parseInt(document.getElementById('overageProtection').value) / 60;
+            const throttlingEnabled = document.getElementById('throttlingEnabled').value === 'true';
+            
+            let throttlingStates = [];
+            let consecutiveOverageHours = 0;
+            let protectionUsed = 0;
+            
+            for (let i = 0; i < smoothedUtilization.length; i++) {
+                const utilization = smoothedUtilization[i];
+                const futureCapacity = futureCapacityConsumed[i];
+                const utilizationPercent = (utilization / baselineCUs) * 100;
+                
+                let currentState = {
+                    hour: i,
+                    utilization: utilization,
+                    utilizationPercent: utilizationPercent,
+                    futureCapacity: futureCapacity,
+                    interactiveDelay: false,
+                    interactiveRejection: false,
+                    backgroundRejection: false,
+                    inProtection: false,
+                    throttlingReason: [],
+                    severity: 'normal'
+                };
+                
+                if (utilization > baselineCUs && throttlingEnabled) {
+                    consecutiveOverageHours++;
+                    
+                    if (protectionUsed < overageProtection) {
+                        currentState.inProtection = true;
+                        protectionUsed += 1;
+                        currentState.throttlingReason.push(`🛡️ Overage Protection (${protectionUsed.toFixed(1)}h/${overageProtection.toFixed(1)}h usado)`);
+                    } else {
+                        if (consecutiveOverageHours >= interactiveDelayThreshold) {
+                            currentState.interactiveDelay = true;
+                            currentState.severity = 'warning';
+                            currentState.throttlingReason.push(`⏳ Interactive Delay activado (>${interactiveDelayThreshold.toFixed(1)}h overage)`);
+                        }
+                        
+                        if (consecutiveOverageHours >= interactiveRejectionThreshold) {
+                            currentState.interactiveRejection = true;
+                            currentState.severity = 'danger';
+                            currentState.throttlingReason.push(`🚫 Interactive Rejection activado (>${interactiveRejectionThreshold.toFixed(1)}h overage)`);
+                        }
+                        
+                        if (futureCapacity > backgroundRejectionThreshold) {
+                            currentState.backgroundRejection = true;
+                            currentState.severity = 'critical';
+                            currentState.throttlingReason.push(`⛔ Background Rejection activado (${futureCapacity.toFixed(1)}h > ${backgroundRejectionThreshold}h limit)`);
+                        }
+                    }
+                    
+                    if (utilizationPercent > 150) {
+                        currentState.throttlingReason.push(`🔥 Utilización crítica (${utilizationPercent.toFixed(0)}%)`);
+                    } else if (utilizationPercent > 120) {
+                        currentState.throttlingReason.push(`⚠️ Utilización alta (${utilizationPercent.toFixed(0)}%)`);
+                    }
+                } else {
+                    consecutiveOverageHours = 0;
+                    protectionUsed = Math.max(0, protectionUsed - 0.5);
+                }
+                
+                throttlingStates.push(currentState);
+            }
+            
+            return throttlingStates;
+        }
+
+        function updateCharts() {
+            const baselineCUs = parseInt(document.getElementById('skuSelect').value);
+            const burstHour = parseInt(document.getElementById('burstHour').value);
+            const burstCUs = parseInt(document.getElementById('burstCUs').value);
+            const burstDuration = parseInt(document.getElementById('burstDuration').value);
+            const baseActivity = parseInt(document.getElementById('baseActivity').value) / 100;
+            const additionalOps = document.getElementById('additionalOps').value;
+
+            const hours = [];
+            const baselineCapacity = [];
+            const realUtilization = [];
+            const smoothedUtilization = [];
+            const throttlingZone = [];
+            const overageGenerated = [];
+            const overageAccumulated = [];
+            const futureCapacityConsumed = [];
+
+            const smoothingData = calculateSmoothingDistribution(burstHour, burstCUs, burstDuration, baselineCUs);
+            
+            let accumulatedOverage = 0;
+            let futureCapacityUsed = 0;
+
+            for (let i = 0; i < 24; i++) {
+                const timeLabel = `${i.toString().padStart(2, '0')}:00`;
+                hours.push(timeLabel);
+                baselineCapacity.push(baselineCUs);
+
+                const baseLoad = baselineCUs * baseActivity;
+                const additionalLoad = generateAdditionalOperations(i, additionalOps, baselineCUs);
+
+                let realUtil = baseLoad + additionalLoad;
+                if (i === burstHour) {
+                    realUtil += burstCUs;
+                }
+
+                realUtilization.push(realUtil);
+
+                let currentOverage = 0;
+                if (i === burstHour) {
+                    currentOverage = smoothingData.totalOverage;
+                }
+                overageGenerated.push(currentOverage);
+                accumulatedOverage += currentOverage;
+
+                let smoothedUtil = baseLoad + additionalLoad;
+                
+                if (i >= burstHour) {
+                    smoothedUtil += smoothingData.smoothingPerHour;
+                    accumulatedOverage = Math.max(0, accumulatedOverage - smoothingData.smoothingPerHour);
+                }
+
+                smoothedUtilization.push(smoothedUtil);
+
+                if (smoothedUtil > baselineCUs) {
+                    futureCapacityUsed += (smoothedUtil - baselineCUs);
+                }
+                futureCapacityConsumed.push(futureCapacityUsed);
+
+                throttlingZone.push(smoothedUtil > baselineCUs ? smoothedUtil : null);
+                overageAccumulated.push(accumulatedOverage);
+            }
+
+            const throttlingStates = calculateThrottlingStates(smoothedUtilization, futureCapacityConsumed, baselineCUs, hours);
+            
+            const analysis = analyzeDetailedResults({
+                baselineCUs,
+                realUtilization,
+                smoothedUtilization,
+                hours,
+                smoothingData,
+                overageAccumulated,
+                futureCapacityConsumed,
+                throttlingStates
+            });
+
+            updateAnalysisResults(analysis);
+
+            // Actualizar gráfico principal
+            if (mainChart) mainChart.destroy();
+            const ctx1 = document.getElementById('mainChart').getContext('2d');
+            mainChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [
+                        {
+                            label: `Baseline Capacity (${baselineCUs} CUs)`,
+                            data: baselineCapacity,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true
+                        },
+                        {
+                            label: 'Utilización Real (sin smoothing)',
+                            data: realUtilization,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Utilización Smoothed (facturada)',
+                            data: smoothedUtilization,
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Throttling Zone',
+                            data: throttlingZone,
+                            borderColor: '#6610f2',
+                            backgroundColor: 'rgba(102, 16, 242, 0.3)',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            spanGaps: false,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Hora del Día' }},
+                        y: { 
+                            title: { display: true, text: 'Capacity Units (CUs)' },
+                            beginAtZero: true,
+                            max: Math.max(...realUtilization, ...smoothedUtilization) * 1.1
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Real vs Smoothed: F${baselineCUs} | Burst: ${burstCUs} CUs a las ${burstHour}:00 (${burstDuration}min)`,
+                            font: { size: 14, weight: 'bold' }
+                        },
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            callbacks: {
+                                afterBody: function(tooltipItems) {
+                                    const hour = parseInt(tooltipItems[0].label.split(':')[0]);
+                                    const realValue = realUtilization[hour];
+                                    const smoothedValue = smoothedUtilization[hour];
+                                    
+                                    let explanation = `\n💡 Real: ${realValue.toFixed(1)} CUs\n📊 Smoothed: ${smoothedValue.toFixed(1)} CUs`;
+                                    
+                                    if (hour === burstHour) {
+                                        explanation += `\n🚀 BURST: ${burstCUs} CUs por ${burstDuration} min`;
+                                        explanation += `\n📈 Overage: ${smoothingData.totalOverage.toFixed(1)} CU-hours`;
+                                    }
+                                    
+                                    if (hour >= burstHour && smoothingData.smoothingPerHour > 0) {
+                                        explanation += `\n⚡ Smoothing: +${smoothingData.smoothingPerHour.toFixed(2)} CUs/hora`;
+                                    }
+                                    
+                                    const state = throttlingStates[hour];
+                                    if (state && state.throttlingReason.length > 0) {
+                                        explanation += `\n🚦 THROTTLING:`;
+                                        state.throttlingReason.forEach(reason => {
+                                            explanation += `\n  ${reason}`;
+                                        });
+                                    }
+                                    
+                                    if (smoothedValue > baselineCUs) {
+                                        explanation += `\n⚠️ Throttling Risk: ${((smoothedValue/baselineCUs)*100).toFixed(0)}%`;
+                                    }
+                                    
+                                    return explanation;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Actualizar gráfico de overages
+            if (overageChart) overageChart.destroy();
+            const ctx2 = document.getElementById('overageChart').getContext('2d');
+            overageChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: hours,
+                    datasets: [
+                        {
+                            label: 'Overage Generado',
+                            data: overageGenerated,
+                            backgroundColor: 'rgba(23, 162, 184, 0.7)',
+                            borderColor: '#17a2b8',
+                            borderWidth: 1,
+                            type: 'bar'
+                        },
+                        {
+                            label: 'Overage Acumulado',
+                            data: overageAccumulated,
+                            borderColor: '#fd7e14',
+                            backgroundColor: 'rgba(253, 126, 20, 0.1)',
+                            borderWidth: 3,
+                            type: 'line',
+                            tension: 0.3,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Future Capacity Consumida',
+                            data: futureCapacityConsumed,
+                            borderColor: '#e83e8c',
+                            backgroundColor: 'rgba(232, 62, 140, 0.1)',
+                            borderWidth: 2,
+                            type: 'line',
+                            tension: 0.3,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Hora del Día' }},
+                        y: { 
+                            title: { display: true, text: 'CU-hours' },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Overages y Smoothing: Total ${smoothingData.totalOverage.toFixed(1)} CU-hours distribuidos en 24h`,
+                            font: { size: 14, weight: 'bold' }
+                        },
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            callbacks: {
+                                afterBody: function(tooltipItems) {
+                                    const hour = parseInt(tooltipItems[0].label.split(':')[0]);
+                                    let explanation = '';
+                                    
+                                    if (overageGenerated[hour] > 0) {
+                                        explanation += `\n🎯 BURST GENERÓ: ${overageGenerated[hour].toFixed(1)} CU-hours de overage`;
+                                        explanation += `\n⏱️ Se distribuirá durante 24 horas`;
+                                    }
+                                    
+                                    if (overageAccumulated[hour] > 0) {
+                                        explanation += `\n📊 PENDIENTE: ${overageAccumulated[hour].toFixed(1)} CU-hours por "quemar"`;
+                                    }
+                                    
+                                    if (hour >= burstHour) {
+                                        const hoursSinceBurst = hour - burstHour;
+                                        const consumed = hoursSinceBurst * smoothingData.smoothingPerHour;
+                                        explanation += `\n⚡ CONSUMIDO: ${consumed.toFixed(1)} CU-hours desde el burst`;
+                                    }
+                                    
+                                    return explanation;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function analyzeDetailedResults(data) {
+            const { baselineCUs, realUtilization, smoothedUtilization, smoothingData, overageAccumulated, futureCapacityConsumed, throttlingStates } = data;
+            
+            let throttlingEvents = [];
+            let maxReal = Math.max(...realUtilization);  
+            let maxSmoothed = Math.max(...smoothedUtilization);
+            let throttleHours = 0;
+            let interactiveDelayHours = 0;
+            let interactiveRejectionHours = 0;
+            let backgroundRejectionHours = 0;
+            let protectionHours = 0;
+
+            throttlingStates.forEach((state, hour) => {
+                if (state.interactiveDelay || state.interactiveRejection || state.backgroundRejection) {
+                    throttleHours++;
+                }
+                if (state.interactiveDelay) interactiveDelayHours++;
+                if (state.interactiveRejection) interactiveRejectionHours++;
+                if (state.backgroundRejection) backgroundRejectionHours++;
+                if (state.inProtection) protectionHours++;
+                
+                if (state.severity !== 'normal') {
+                    throttlingEvents.push({
+                        hour: hour,
+                        timeLabel: `${hour.toString().padStart(2, '0')}:00`,
+                        utilization: state.utilization.toFixed(1),
+                        utilizationPercent: state.utilizationPercent.toFixed(0),
+                        severity: state.severity,
+                        reasons: state.throttlingReason,
+                        futureCapacity: state.futureCapacity.toFixed(1)
+                    });
+                }
+            });
+
+            return {
+                hasThrottling: throttlingEvents.length > 0,
+                throttlingEvents,
+                maxReal: maxReal.toFixed(1),
+                maxSmoothed: maxSmoothed.toFixed(1),
+                throttleHours,
+                interactiveDelayHours,
+                interactiveRejectionHours,
+                backgroundRejectionHours,
+                protectionHours,
+                smoothingData,
+                peakOverage: Math.max(...overageAccumulated).toFixed(1),
+                finalOverage: overageAccumulated[23].toFixed(1),
+                throttlingStates
+            };
+        }
+
+        function updateAnalysisResults(analysis) {
+            const throttlingDiv = document.getElementById('throttlingStatus');
+            const causesDiv = document.getElementById('throttlingCauses');
+            const timelineDiv = document.getElementById('throttlingTimeline');
+
+            if (!analysis.hasThrottling) {
+                throttlingDiv.innerHTML = `
+                    <div class="no-throttling">
+                        ✅ <strong>Sin Throttling Detectado</strong><br>
+                        Max utilización smoothed: ${analysis.maxSmoothed} CUs<br>
+                        Horas con protección: ${analysis.protectionHours}h
+                    </div>
+                `;
+                causesDiv.innerHTML = '';
+                timelineDiv.innerHTML = '';
+            } else {
+                throttlingDiv.innerHTML = `
+                    <div class="throttling-alert">
+                        🚨 <strong>Throttling Detectado</strong><br>
+                        ${analysis.throttlingEvents.length} eventos críticos<br>
+                        <small>
+                        📊 Interactive Delay: ${analysis.interactiveDelayHours}h |
+                        🚫 Interactive Rejection: ${analysis.interactiveRejectionHours}h |
+                        ⛔ Background Rejection: ${analysis.backgroundRejectionHours}h |
+                        🛡️ Protección: ${analysis.protectionHours}h
+                        </small>
+                    </div>
+                `;
+                
+                let causesHtml = '<h5>⚠️ Tipos de Throttling Detectados:</h5><ul>';
+                const uniqueReasons = new Set();
+                
+                analysis.throttlingEvents.forEach(event => {
+                    event.reasons.forEach(reason => uniqueReasons.add(reason));
+                });
+                
+                uniqueReasons.forEach(reason => {
+                    causesHtml += `<li>${reason}</li>`;
+                });
+                causesHtml += '</ul>';
+                causesDiv.innerHTML = causesHtml;
+
+                let timelineHtml = '<h5>⏰ Timeline de Throttling:</h5>';
+                timelineHtml += '<table class="overage-table"><tr><th>Hora</th><th>Util%</th><th>Severidad</th><th>Estado</th></tr>';
+                
+                analysis.throttlingEvents.slice(0, 8).forEach(event => {
+                    let severityIcon = '';
+                    let severityColor = '';
+                    switch(event.severity) {
+                        case 'warning': severityIcon = '⏳'; severityColor = '#ffc107'; break;
+                        case 'danger': severityIcon = '🚫'; severityColor = '#dc3545'; break;
+                        case 'critical': severityIcon = '⛔'; severityColor = '#8B0000'; break;
+                        default: severityIcon = '⚠️'; severityColor = '#6c757d';
+                    }
+                    
+                    timelineHtml += `<tr style="background-color: ${severityColor}22;">
+                        <td><strong>${event.timeLabel}</strong></td>
+                        <td>${event.utilizationPercent}%</td>
+                        <td>${severityIcon}</td>
+                        <td style="font-size: 10px;">${event.reasons[0]?.split('(')[0] || 'N/A'}</td>
+                    </tr>`;
+                });
+                
+                if (analysis.throttlingEvents.length > 8) {
+                    timelineHtml += `<tr><td colspan="4"><em>... y ${analysis.throttlingEvents.length - 8} eventos más</em></td></tr>`;
+                }
+                timelineHtml += '</table>';
+                timelineDiv.innerHTML = timelineHtml;
+            }
+
+            const smoothingDiv = document.getElementById('smoothingAnalysis');
+            if (analysis.smoothingData.totalOverage > 0) {
+                smoothingDiv.innerHTML = `
+                    <div class="smoothing-info">
+                        <strong>📊 Smoothing Activo</strong><br>
+                        <strong>Overage Total:</strong> ${analysis.smoothingData.totalOverage.toFixed(1)} CU-hours<br>
+                        <strong>Distribución:</strong> ${analysis.smoothingData.smoothingPerHour.toFixed(2)} CUs/hora por 24h<br>
+                        <strong>Peak Acumulado:</strong> ${analysis.peakOverage} CU-hours<br>
+                        <strong>Remanente Final:</strong> ${analysis.finalOverage} CU-hours
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px;">
+                        💡 <strong>Explicación:</strong> La operación original usó ${analysis.smoothingData.realCUsUsed.toFixed(1)} CU-hours, 
+                        pero se distribuye durante 24 horas para evitar picos de facturación.
+                    </div>
+                `;
+            } else {
+                smoothingDiv.innerHTML = `
+                    <div class="no-throttling">
+                        ✅ <strong>Sin Smoothing Necesario</strong><br>
+                        Todas las operaciones están dentro del baseline
+                    </div>
+                `;
+            }
+
+            document.getElementById('maxReal').textContent = `${analysis.maxReal} CUs`;
+            document.getElementById('maxSmoothed').textContent = `${analysis.maxSmoothed} CUs`;
+            document.getElementById('totalOverage').textContent = `${analysis.smoothingData.totalOverage.toFixed(1)} CU-h`;
+            document.getElementById('throttleHours').textContent = `${analysis.throttleHours}h`;
+        }
+
+        // Event listeners
+        document.getElementById('skuSelect').addEventListener('change', updateCharts);
+        document.getElementById('burstHour').addEventListener('change', updateCharts);
+        document.getElementById('burstCUs').addEventListener('change', updateCharts);
+        document.getElementById('burstDuration').addEventListener('change', updateCharts);
+        document.getElementById('baseActivity').addEventListener('change', updateCharts);
+        document.getElementById('additionalOps').addEventListener('change', updateCharts);
+        document.getElementById('interactiveDelayThreshold').addEventListener('change', updateCharts);
+        document.getElementById('interactiveRejectionThreshold').addEventListener('change', updateCharts);
+        document.getElementById('backgroundRejectionThreshold').addEventListener('change', updateCharts);
+        document.getElementById('overageProtection').addEventListener('change', updateCharts);
+        document.getElementById('throttlingEnabled').addEventListener('change', updateCharts);
+        document.getElementById('throttlingMode').addEventListener('change', updateCharts);
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadScenario('simple_burst');
+        });
+    </script>
+</body>
+</html>
