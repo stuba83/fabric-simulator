@@ -1,0 +1,10 @@
+{
+  "name": "fabric-simulator",
+  "version": "1.0.0",
+  "description": "Microsoft Fabric Bursting, Smoothing and Throttling Simulator",
+  "scripts": {
+    "build": "echo 'No build needed for static HTML' && exit 0"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}
